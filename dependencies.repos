@@ -26,3 +26,7 @@
     local-name: trajectory_preview
     uri: https://github.com/marip8/trajectory_preview.git
     version: 2.0.0
+- git:
+    local-name: snp_automate_2022
+    uri: https://github.com/ros-industrial-consortium/snp_automate_2022.git
+    version: 5af2950abcea103ff76b27447affab8f60e43cfe

@@ -195,7 +195,7 @@ task_composer_plugins:
                       output_data: output_data
                     indexing: [output_data]
                 transition:
-                  task: SNPTransitionPipeline
+                  task: SNPFreespacePipeline
                   config:
                     remapping:
                       input_data: output_data
