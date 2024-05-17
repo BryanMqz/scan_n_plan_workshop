@@ -16,6 +16,8 @@
 #include <QMessageBox>
 #include <QTextStream>
 #include <QScrollBar>
+#include <QTextEdit>
+#include <QStackedWidget>
 #include <snp_tpp/tpp_widget.h>
 #include <trajectory_preview/trajectory_preview_widget.h>
 
@@ -158,6 +160,8 @@ BT::BehaviorTreeFactory SNPWidget::createBTFactory(int ros_short_timeout, int ro
   bt_factory.registerNodeType<SetPageDecoratorNode>("SetPage");
   bt_factory.registerNodeType<SNPSequenceWithMemory>("SNPSequenceWithMemory");
   bt_factory.registerNodeType<RosSpinnerNode>("RosSpinner", bt_node_);
+  bt_factory.registerNodeType<ReverseTrajectoryNode>("ReverseTrajectory");
+  bt_factory.registerNodeType<CombineTrajectoriesNode>("CombineTrajectories");
 
   BT::RosNodeParams ros_params;
   ros_params.nh = bt_node_;
@@ -238,6 +242,16 @@ void SNPWidget::runTreeWithThread()
     QMessageBox::warning(this, QString::fromStdString("Error"), QString::fromStdString(ex.what()));
     return;
   }
+}
+
+QStackedWidget* SNPWidget::getStackedWidget()
+{
+  return ui_->stacked_widget;
+}
+
+QTextEdit* SNPWidget::getTextEdit()
+{
+  return ui_->text_edit_log;
 }
 
 }  // namespace snp_application

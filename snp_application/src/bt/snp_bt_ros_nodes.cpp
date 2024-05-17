@@ -269,8 +269,10 @@ trajectory_msgs::msg::JointTrajectory combine(const trajectory_msgs::msg::JointT
     // trajectory
     const auto lhs_duration =
         first.points.empty() ? builtin_interfaces::msg::Duration() : first.points.back().time_from_start;
-    for (const auto& pt : second.points)
+    for (std::size_t i = 1; i < second.points.size(); ++i)
     {
+      const trajectory_msgs::msg::JointTrajectoryPoint& pt = second.points[i];
+
       result.points.push_back(pt);
       result.points.back().time_from_start =
           rclcpp::Duration(result.points.back().time_from_start) + rclcpp::Duration(lhs_duration);
@@ -290,8 +292,10 @@ trajectory_msgs::msg::JointTrajectory combine(const trajectory_msgs::msg::JointT
     // Create new trajectory points from the subset with the additional superset joints
     const auto first_duration =
         first.points.empty() ? builtin_interfaces::msg::Duration() : first.points.back().time_from_start;
-    for (const trajectory_msgs::msg::JointTrajectoryPoint& pt : second.points)
+    for (std::size_t i = 1; i < second.points.size(); ++i)
     {
+      const trajectory_msgs::msg::JointTrajectoryPoint& pt = second.points[i];
+
       // Copy the new trajectory point from the back of the first trajectory
       trajectory_msgs::msg::JointTrajectoryPoint new_pt(first.points.back());
 
@@ -326,7 +330,7 @@ trajectory_msgs::msg::JointTrajectory combine(const trajectory_msgs::msg::JointT
     std::vector<std::size_t> indices = getSubsetIndices(second.joint_names, first.joint_names);
 
     // Iterate over the first points backwards and push them into the front of the new trajectory
-    for (auto it = first.points.rbegin(); it != first.points.rend(); ++it)
+    for (auto it = first.points.rbegin() + 1; it != first.points.rend(); ++it)
     {
       // Copy the trajectory from the first point of the second trajectory
       trajectory_msgs::msg::JointTrajectoryPoint new_pt(second.points.front());
@@ -337,7 +341,6 @@ trajectory_msgs::msg::JointTrajectory combine(const trajectory_msgs::msg::JointT
         const std::size_t idx = indices[i];
         new_pt.positions[idx] = it->positions[i];
       }
-
       // Insert the new trajectory point at the beginning of the trajectory
       out.points.insert(out.points.begin(), new_pt);
     }
@@ -352,14 +355,12 @@ bool MotionPlanPubNode::setMessage(trajectory_msgs::msg::JointTrajectory& msg)
 {
   try
   {
-    msg = combine(msg, getBTInput<trajectory_msgs::msg::JointTrajectory>(this, APPROACH_INPUT_PORT_KEY));
-    msg = combine(msg, getBTInput<trajectory_msgs::msg::JointTrajectory>(this, PROCESS_INPUT_PORT_KEY));
-    msg = combine(msg, getBTInput<trajectory_msgs::msg::JointTrajectory>(this, DEPARTURE_INPUT_PORT_KEY));
+    msg = getBTInput<trajectory_msgs::msg::JointTrajectory>(this, TRAJECTORY_INPUT_PORT_KEY);
   }
   catch (const std::exception& ex)
   {
     std::stringstream ss;
-    ss << "Error combining trajectories: '" << ex.what() << "'";
+    ss << "Error extracting trajectory message: '" << ex.what() << "'";
     config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
     return false;
   }
@@ -458,6 +459,118 @@ BT::NodeStatus UpdateTrajectoryStartStateNode::onTick(const typename sensor_msgs
   }
 
   BT::Result output = setOutput(TRAJECTORY_OUTPUT_PORT_KEY, trajectory);
+  if (!output)
+  {
+    std::stringstream ss;
+    ss << "Failed to set required output value: '" << output.error() << "'";
+    config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
+    return BT::NodeStatus::FAILURE;
+  }
+
+  return BT::NodeStatus::SUCCESS;
+}
+
+/**
+ * @details Adapted from
+ * https://github.com/a5-robotics/A5/blob/1c1b280970722c6b41d997f91ef50ff1571eeeac/a5_utils/src/trajectories/trajectories.cpp#L77C4-L96
+ */
+trajectory_msgs::msg::JointTrajectory reverseTrajectory(const trajectory_msgs::msg::JointTrajectory& in)
+{
+  trajectory_msgs::msg::JointTrajectory out;
+  out.header = in.header;
+  out.joint_names = in.joint_names;
+
+  const rclcpp::Duration& path_duration = in.points.back().time_from_start;
+
+  for (auto it = in.points.rbegin(); it != in.points.rend(); ++it)
+  {
+    trajectory_msgs::msg::JointTrajectoryPoint pt(*it);
+
+    // Change the signs of the velocity and acceleration
+    for (std::size_t i = 0; i < pt.velocities.size(); ++i)
+    {
+      pt.velocities[i] = -pt.velocities[i];
+    }
+    for (std::size_t i = 0; i < pt.accelerations.size(); ++i)
+    {
+      pt.accelerations[i] = -pt.accelerations[i];
+    }
+
+    // Change the time from start
+    pt.time_from_start = path_duration - it->time_from_start;
+
+    out.points.push_back(std::move(pt));
+  }
+
+  return out;
+}
+
+ReverseTrajectoryNode::ReverseTrajectoryNode(const std::string& instance_name, const BT::NodeConfig& config)
+  : BT::ControlNode(instance_name, config)
+{
+}
+
+BT::NodeStatus ReverseTrajectoryNode::tick()
+{
+  BT::Expected<trajectory_msgs::msg::JointTrajectory> input =
+      getInput<trajectory_msgs::msg::JointTrajectory>(TRAJECTORY_INPUT_PORT_KEY);
+  if (!input)
+  {
+    std::stringstream ss;
+    ss << "Failed to get required input value: '" << input.error() << "'";
+    config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
+    return BT::NodeStatus::FAILURE;
+  }
+  trajectory_msgs::msg::JointTrajectory in = input.value();
+
+  trajectory_msgs::msg::JointTrajectory out = reverseTrajectory(in);
+
+  BT::Result output = setOutput(TRAJECTORY_OUTPUT_PORT_KEY, out);
+  if (!output)
+  {
+    std::stringstream ss;
+    ss << "Failed to set required output value: '" << output.error() << "'";
+    config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
+    return BT::NodeStatus::FAILURE;
+  }
+
+  return BT::NodeStatus::SUCCESS;
+}
+
+CombineTrajectoriesNode::CombineTrajectoriesNode(const std::string& instance_name, const BT::NodeConfig& config)
+  : BT::ControlNode(instance_name, config)
+{
+}
+
+BT::NodeStatus CombineTrajectoriesNode::tick()
+{
+  BT::Expected<trajectory_msgs::msg::JointTrajectory> first_input =
+      getInput<trajectory_msgs::msg::JointTrajectory>(FIRST_TRAJECTORY_INPUT_PORT_KEY);
+  BT::Expected<trajectory_msgs::msg::JointTrajectory> second_input =
+      getInput<trajectory_msgs::msg::JointTrajectory>(SECOND_TRAJECTORY_INPUT_PORT_KEY);
+
+  if (!first_input)
+  {
+    std::stringstream ss;
+    ss << "Failed to get required input value: '" << first_input.error() << "'";
+    config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
+    return BT::NodeStatus::FAILURE;
+  }
+
+  if (!second_input)
+  {
+    std::stringstream ss;
+    ss << "Failed to get required input value: '" << second_input.error() << "'";
+    config().blackboard->set(ERROR_MESSAGE_KEY, ss.str());
+    return BT::NodeStatus::FAILURE;
+  }
+
+  trajectory_msgs::msg::JointTrajectory first_trajectory = first_input.value();
+  trajectory_msgs::msg::JointTrajectory second_trajectory = second_input.value();
+
+  trajectory_msgs::msg::JointTrajectory out = combine(first_trajectory, second_trajectory);
+
+  BT::Result output = setOutput(TRAJECTORY_OUTPUT_PORT_KEY, out);
   if (!output)
   {
     std::stringstream ss;

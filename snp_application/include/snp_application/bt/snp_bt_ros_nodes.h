@@ -257,16 +257,10 @@ public:
 class MotionPlanPubNode : public BT::RosTopicPubNode<trajectory_msgs::msg::JointTrajectory>
 {
 public:
-  inline static std::string APPROACH_INPUT_PORT_KEY = "approach";
-  inline static std::string PROCESS_INPUT_PORT_KEY = "process";
-  inline static std::string DEPARTURE_INPUT_PORT_KEY = "departure";
+  inline static std::string TRAJECTORY_INPUT_PORT_KEY = "trajectory";
   inline static BT::PortsList providedPorts()
   {
-    return providedBasicPorts({
-        BT::InputPort<trajectory_msgs::msg::JointTrajectory>(APPROACH_INPUT_PORT_KEY),
-        BT::InputPort<trajectory_msgs::msg::JointTrajectory>(PROCESS_INPUT_PORT_KEY),
-        BT::InputPort<trajectory_msgs::msg::JointTrajectory>(DEPARTURE_INPUT_PORT_KEY),
-    });
+    return providedBasicPorts({ BT::InputPort<trajectory_msgs::msg::JointTrajectory>(TRAJECTORY_INPUT_PORT_KEY) });
   }
   using BT::RosTopicPubNode<trajectory_msgs::msg::JointTrajectory>::RosTopicPubNode;
 
@@ -300,6 +294,38 @@ public:
   using BT::RosTopicSubNode<sensor_msgs::msg::JointState>::RosTopicSubNode;
 
   BT::NodeStatus onTick(const typename sensor_msgs::msg::JointState::SharedPtr& last_msg) override;
+};
+
+class ReverseTrajectoryNode : public BT::ControlNode
+{
+public:
+  inline static std::string TRAJECTORY_INPUT_PORT_KEY = "input";
+  inline static std::string TRAJECTORY_OUTPUT_PORT_KEY = "output";
+  inline static BT::PortsList providedPorts()
+  {
+    return { BT::InputPort<trajectory_msgs::msg::JointTrajectory>(TRAJECTORY_INPUT_PORT_KEY),
+             BT::OutputPort<trajectory_msgs::msg::JointTrajectory>(TRAJECTORY_OUTPUT_PORT_KEY) };
+  }
+  explicit ReverseTrajectoryNode(const std::string& instance_name, const BT::NodeConfig& config);
+
+  BT::NodeStatus tick() override;
+};
+
+class CombineTrajectoriesNode : public BT::ControlNode
+{
+public:
+  inline static std::string FIRST_TRAJECTORY_INPUT_PORT_KEY = "first";
+  inline static std::string SECOND_TRAJECTORY_INPUT_PORT_KEY = "second";
+  inline static std::string TRAJECTORY_OUTPUT_PORT_KEY = "output";
+  inline static BT::PortsList providedPorts()
+  {
+    return { BT::InputPort<trajectory_msgs::msg::JointTrajectory>(FIRST_TRAJECTORY_INPUT_PORT_KEY),
+             BT::InputPort<trajectory_msgs::msg::JointTrajectory>(SECOND_TRAJECTORY_INPUT_PORT_KEY),
+             BT::OutputPort<trajectory_msgs::msg::JointTrajectory>(TRAJECTORY_OUTPUT_PORT_KEY) };
+  }
+  explicit CombineTrajectoriesNode(const std::string& instance_name, const BT::NodeConfig& config);
+
+  BT::NodeStatus tick() override;
 };
 
 /**

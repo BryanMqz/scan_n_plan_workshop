@@ -12,6 +12,9 @@ namespace Ui
 class SNPWidget;
 }
 
+class QStackedWidget;
+class QTextEdit;
+
 namespace snp_application
 {
 class SNPWidget : public QWidget
@@ -23,6 +26,8 @@ protected:
   void runTreeWithThread();
 
   virtual BT::BehaviorTreeFactory createBTFactory(int ros_short_timeout, int ros_long_timeout);
+  QStackedWidget* getStackedWidget();
+  QTextEdit* getTextEdit();
 
   rclcpp::Node::SharedPtr bt_node_;
   rclcpp::Node::SharedPtr tpp_node_;
