@@ -5,15 +5,15 @@
 - git:
     local-name: noether
     uri: https://github.com/ros-industrial/noether.git
-    version: 548182e74897cd3948e97023aad95b3a9d21ce8f
+    version: 537151dd42076e635eb10a053371d5e9dcb4f056
 - git:
     local-name: industrial_reconstruction
     uri: https://github.com/ros-industrial/industrial_reconstruction.git
     version: 6e1eadada1f86b716a6fcef0ae5ffb291f9b5e66
 - git:
     local-name: rviz_polygon_selection_tool
-    uri: https://github.com/marip8/rviz_polygon_selection_tool.git
-    version: c2bff22f4990f04b8b10d64bbbd832618e0b0c02
+    uri: https://github.com/swri-robotics/rviz_polygon_selection_tool.git
+    version: 1.0.0
 - git:
     local-name: BehaviorTree.CPP
     uri: https://github.com/BehaviorTree/BehaviorTree.CPP.git
